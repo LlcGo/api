@@ -2,11 +2,9 @@ package com.lc.project.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.lc.lcclient.client.LcClient;
 import com.lc.project.annotation.AuthCheck;
-import com.lc.project.common.BaseResponse;
-import com.lc.project.common.DeleteRequest;
-import com.lc.project.common.ErrorCode;
-import com.lc.project.common.ResultUtils;
+import com.lc.project.common.*;
 import com.lc.project.constant.CommonConstant;
 import com.lc.project.exception.BusinessException;
 import com.lc.project.model.dto.interfaceinfo.InterfaceInfoAddRequest;
@@ -14,6 +12,7 @@ import com.lc.project.model.dto.interfaceinfo.InterfaceInfoQueryRequest;
 import com.lc.project.model.dto.interfaceinfo.InterfaceInfoUpdateRequest;
 import com.lc.project.model.entity.InterfaceInfo;
 import com.lc.project.model.entity.User;
+import com.lc.project.model.enums.InterfaceStateEnum;
 import com.lc.project.service.InterfaceInfoService;
 import com.lc.project.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +40,8 @@ public class InterfaceInfoController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private LcClient lcClient;
 
     /**
      * 创建
@@ -195,4 +196,54 @@ public class InterfaceInfoController {
 
     // endregion
 
+    @AuthCheck(mustRole = "admin")
+    @PostMapping("/online")
+    public BaseResponse<Boolean> onlineInterfaceInfo(@RequestBody IdRequest idRequest,
+                                                     HttpServletRequest request) {
+        if (idRequest == null || idRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        InterfaceInfo interfaceInfo = new InterfaceInfo();
+        BeanUtils.copyProperties(idRequest, interfaceInfo);
+        // 参数校验
+        long id = idRequest.getId();
+        // 判断是否存在
+        InterfaceInfo oldInterfaceInfo = interfaceInfoService.getById(id);
+        if (oldInterfaceInfo == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+        com.lc.lcclient.model.User user = new com.lc.lcclient.model.User();
+        user.setUserName("test");
+        String usernameByPost = lcClient.getUsernameByPost(user);
+        if(StringUtils.isBlank(usernameByPost)){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR,"验证失败");
+        }
+        //上线
+        interfaceInfo.setStatus(InterfaceStateEnum.ONLINE.getValue());
+        boolean result = interfaceInfoService.updateById(interfaceInfo);
+        return ResultUtils.success(result);
+    }
+
+    @AuthCheck(mustRole = "admin")
+    @PostMapping("/offline")
+    public BaseResponse<Boolean> offlineInterfaceInfo(@RequestBody IdRequest idRequest,
+                                                     HttpServletRequest request) {
+        if (idRequest == null || idRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        InterfaceInfo interfaceInfo = new InterfaceInfo();
+        BeanUtils.copyProperties(idRequest, interfaceInfo);
+        // 参数校验
+
+        long id = idRequest.getId();
+        // 判断是否存在
+        InterfaceInfo oldInterfaceInfo = interfaceInfoService.getById(id);
+        if (oldInterfaceInfo == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+        //下线
+        interfaceInfo.setStatus(InterfaceStateEnum.OFFLINE.getValue());
+        boolean result = interfaceInfoService.updateById(interfaceInfo);
+        return ResultUtils.success(result);
+    }
 }
